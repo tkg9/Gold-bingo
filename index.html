@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>SOM Bingo</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" defer></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@600;700;800&display=swap');
+
+  :root {
+    --tile-default-bg: linear-gradient(145deg, #f0d77f, #e6c85c);
+    --tile-default-color: #776e65;
+    --tile-pressed-bg: linear-gradient(145deg, #f7896d, #e66a4f);
+    --tile-pressed-color: #f9f6f2;
+    --board-bg: #bbada0;
+    --page-bg: #faf8ef;
+    --text-dark: #776e65;
+    --radius: 7px;
+    --gap: 8px;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Nunito', sans-serif;
+    background: var(--page-bg);
+    color: var(--text-dark);
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  #app {
+    width: 100%;
+    max-width: 420px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+  }
+
+  /* ── Header ── */
+  .header {
+    text-align: center;
+    width: 100%;
+  }
+
+  .header h1 {
+    font-family: 'Lilita One', cursive;
+    font-size: clamp(28px, 8vw, 42px);
+    color: var(--text-dark);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    line-height: 1.1;
+  }
+
+  .event-label {
+    margin-top: 6px;
+    font-weight: 800;
+    font-size: clamp(13px, 3.5vw, 17px);
+    color: #f67c5f;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    min-height: 1.4em;
+  }
+
+  /* ── Status banner ── */
+  .status-banner {
+    width: 100%;
+    text-align: center;
+    padding: 10px 16px;
+    border-radius: 10px;
+    font-weight: 700;
+    font-size: clamp(12px, 2.8vw, 14px);
+    line-height: 1.4;
+    transition: background 0.3s ease, color 0.3s ease;
+  }
+
+  .status-banner.live {
+    background: linear-gradient(145deg, #a8d8a8, #7bc67b);
+    color: #f9f6f2;
+  }
+
+  .status-banner.preview {
+    background: var(--board-bg);
+    color: #f9f6f2;
+  }
+
+  .status-banner .status-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #f9f6f2;
+    margin-right: 6px;
+    vertical-align: middle;
+    animation: pulse 1.5s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  /* ── Board ── */
+  .board-wrapper {
+    background: var(--board-bg);
+    border-radius: 10px;
+    padding: var(--gap);
+    width: 100%;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.12);
+  }
+
+  .board {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--gap);
+    width: 100%;
+  }
+
+  /* ── Tiles ── */
+  .tile {
+    aspect-ratio: 1;
+    border-radius: var(--radius);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 6px;
+    cursor: pointer;
+    user-select: none;
+    -webkit-user-select: none;
+    background: var(--tile-default-bg);
+    color: var(--tile-default-color);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.08);
+    font-family: Helvetica, Arial, sans-serif;
+    font-weight: 700;
+    font-size: clamp(10px, 2.4vw, 15px);
+    text-transform: uppercase;
+    line-height: 1.2;
+    letter-spacing: 0.3px;
+    transition: transform 0.12s cubic-bezier(0.34, 1.56, 0.64, 1),
+                box-shadow 0.15s ease;
+    will-change: transform;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .tile .tile-bg {
+    position: absolute;
+    inset: 0;
+    border-radius: var(--radius);
+    background: var(--tile-default-bg);
+    transition: opacity 0.15s ease;
+    z-index: 0;
+  }
+
+  .tile .tile-bg-pressed {
+    position: absolute;
+    inset: 0;
+    border-radius: var(--radius);
+    background: var(--tile-pressed-bg);
+    opacity: 0;
+    transition: opacity 0.15s ease;
+    z-index: 1;
+  }
+
+  .tile.selected .tile-bg { opacity: 0; }
+  .tile.selected .tile-bg-pressed { opacity: 1; }
+  .tile.selected { color: var(--tile-pressed-color); }
+
+  .tile .tile-text {
+    position: relative;
+    z-index: 2;
+    pointer-events: none;
+  }
+
+  .tile:active { transform: scale(0.92); }
+
+  .tile.bounce {
+    animation: tileBounce 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  @keyframes tileBounce {
+    0%   { transform: scale(0.92); }
+    50%  { transform: scale(1.06) translateY(-2px); }
+    100% { transform: scale(1) translateY(0); }
+  }
+
+  /* Free tile — same red as selected */
+  .tile.free {
+    cursor: default;
+    color: var(--tile-pressed-color);
+  }
+  .tile.free .tile-bg { background: var(--tile-pressed-bg); opacity: 1; }
+  .tile.free .tile-bg-pressed { display: none; }
+
+  /* ── Share Button ── */
+  .share-btn {
+    background: linear-gradient(145deg, #25d366, #1ebe57);
+    color: #fff;
+    border: none;
+    border-radius: 50px;
+    padding: 12px 28px;
+    font-family: 'Nunito', sans-serif;
+    font-weight: 800;
+    font-size: clamp(14px, 3.5vw, 17px);
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(37, 211, 102, 0.35);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    letter-spacing: 0.5px;
+  }
+
+  .share-btn:active {
+    transform: scale(0.95);
+    box-shadow: 0 2px 6px rgba(37, 211, 102, 0.25);
+  }
+
+  .share-btn svg { width: 20px; height: 20px; fill: #fff; flex-shrink: 0; }
+
+  /* ── Bingo Win ── */
+  .bingo-banner {
+    font-family: 'Lilita One', cursive;
+    font-size: clamp(24px, 7vw, 36px);
+    color: #f67c5f;
+    text-align: center;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    opacity: 0;
+    transform: scale(0.8);
+    transition: opacity 0.3s ease, transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    height: 0;
+    overflow: visible;
+  }
+
+  .bingo-banner.visible {
+    opacity: 1;
+    transform: scale(1);
+    height: auto;
+    padding-bottom: 4px;
+  }
+
+  /* ── Capture area ── */
+  #capture-area {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+  }
+
+  /* ── Toast ── */
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(60px);
+    background: #333;
+    color: #fff;
+    padding: 10px 22px;
+    border-radius: 50px;
+    font-family: 'Nunito', sans-serif;
+    font-weight: 700;
+    font-size: 14px;
+    opacity: 0;
+    transition: transform 0.3s ease, opacity 0.3s ease;
+    z-index: 999;
+    pointer-events: none;
+  }
+
+  .toast.visible {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+</style>
+</head>
+<body>
+
+<div id="app">
+  <div class="header">
+    <h1>SOM Bingo</h1>
+    <div class="event-label" id="event-label"></div>
+  </div>
+
+  <div class="status-banner preview" id="status-banner"></div>
+
+  <div id="capture-area">
+    <div class="board-wrapper">
+      <div class="board" id="board"></div>
+    </div>
+    <div class="bingo-banner" id="bingo-banner">🎉 BINGO! 🎉</div>
+  </div>
+
+  <button class="share-btn" id="share-btn" type="button">
+    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.625.846 5.059 2.284 7.034L.789 23.492a.5.5 0 0 0 .612.616l4.534-1.468A11.956 11.956 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-2.201 0-4.266-.7-5.953-1.912l-.348-.248-2.756.893.916-2.703-.27-.372A9.958 9.958 0 0 1 2 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg>
+    Share to WhatsApp
+  </button>
+</div>
+
+<div class="toast" id="toast">Generating image…</div>
+
+<script>
+(function() {
+  'use strict';
+
+  const GRID_SIZE = 3;
+  const POLL_INTERVAL = 60_000;
+  const HARD_RELOAD_MS = 80 * 60_000;
+  const PERSIST_MAX_MS = 100 * 60_000;
+  const EARLY_START_MIN = 5;
+  const FREE_TEXT = "Class doesn't finish slides (freebie)";
+  const SHARE_URL = "https://sombingo.github.io";
+
+  const OPTIONS = [
+    "\u201CIn the military\u2026\u201D",
+    "Alison apologizes while asking question",
+    "Alison claims she doesn't understand",
+    "Alison is wearing a Yale baseball cap",
+    "Any silver scholar falls asleep",
+    "Baby!",
+    "Clapping when class ends",
+    "Claps for a good answer",
+    "Dan answers when no one else wants to",
+    "Dan gets the sign in sheet and checks to make sure no one else has been skipped",
+    "Derek explains medicine",
+    "Classmate disagrees with professor",
+    "Florence gets a cookie",
+    "Izzy makes incredibly insightful comment",
+    "John mentions working in sales",
+    "Kemal nowhere to be found",
+    "Kevin wears a beanie",
+    "Kshitija is emailing behind her name plaque",
+    "Liana surrenders phone",
+    "Matt Kanzler shows up to class (rare)",
+    "Not clapping when class ends",
+    "Prof uses wrong color on the whiteboard",
+    "Professor outlaws further questions",
+    "Robichaud claps to silence the class",
+    "Someone gets clapped for a great answer",
+    "Someone starts a comment with \u201Cit\u2019s curious because\u2026\u201D",
+    "Swiss Tom talks for >60 seconds",
+    "Thomas Gould understands art or literature reference",
+    "Jaussi lectures professor",
+    "Jaussi wears tank top",
+    "Jaussi answers someone else's question",
+    "Vini walks in late",
+    "Wearing a suit"
+  ];
+
+  const SCHEDULE = [
+    { days: [1, 3], name: 'Executive', startH: 14, startM: 40, endH: 16, endM: 0 },
+    { days: [2, 4], name: 'Macroeconomics', startH: 8, startM: 30, endH: 10, endM: 0 },
+    { days: [2, 4], name: 'Innovator', startH: 10, startM: 10, endH: 11, endM: 30 }
+  ];
+
+  // Date-specific schedule overrides for Executive (month is 0-indexed)
+  // Apr 8 (Wed), Apr 20 (Mon), Apr 27 (Mon) → 11:45 AM–12:45 PM
+  const OVERRIDES = [
+    { month: 3, date: 8,  name: 'Executive', startH: 11, startM: 45, endH: 12, endM: 45, guaranteedTile: 'Most questions are gold' },
+    { month: 3, date: 20, name: 'Executive', startH: 11, startM: 45, endH: 12, endM: 45, guaranteedTile: 'Most questions are gold' },
+    { month: 3, date: 27, name: 'Executive', startH: 11, startM: 45, endH: 12, endM: 45, guaranteedTile: 'Most questions are gold' }
+  ];
+
+  const $eventLabel = document.getElementById('event-label');
+  const $statusBanner = document.getElementById('status-banner');
+  const $board = document.getElementById('board');
+  const $bingoBanner = document.getElementById('bingo-banner');
+  const $shareBtn = document.getElementById('share-btn');
+  const $toast = document.getElementById('toast');
+
+  // ── Time helpers ──
+  function nowET() {
+    return new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }));
+  }
+
+  function minutesSinceMidnight(d) {
+    return d.getHours() * 60 + d.getMinutes();
+  }
+
+  function getOverrideForDate(d) {
+    const m = d.getMonth();
+    const dt = d.getDate();
+    return OVERRIDES.find(o => o.month === m && o.date === dt) || null;
+  }
+
+  function getEventsForDate(d) {
+    const day = d.getDay();
+    const override = getOverrideForDate(d);
+    const events = [];
+
+    for (const ev of SCHEDULE) {
+      if (!ev.days.includes(day)) continue;
+      if (override && override.name === ev.name) {
+        // Use override times instead
+        events.push({ ...ev, startH: override.startH, startM: override.startM, endH: override.endH, endM: override.endM, guaranteedTile: override.guaranteedTile });
+      } else {
+        events.push(ev);
+      }
+    }
+    return events;
+  }
+
+  function getCurrentEvent() {
+    const now = nowET();
+    const mins = minutesSinceMidnight(now);
+    const events = getEventsForDate(now);
+
+    for (const ev of events) {
+      const start = ev.startH * 60 + ev.startM - EARLY_START_MIN;
+      const end = ev.endH * 60 + ev.endM;
+      if (mins >= start && mins < end) return ev;
+    }
+    return null;
+  }
+
+  function getNextEvent() {
+    const now = nowET();
+    const mins = minutesSinceMidnight(now);
+    const dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+
+    // Check rest of today
+    const todayEvents = getEventsForDate(now);
+    for (const ev of todayEvents) {
+      const start = ev.startH * 60 + ev.startM;
+      if (start > mins) {
+        const h = ev.startH > 12 ? ev.startH - 12 : ev.startH;
+        const ampm = ev.startH >= 12 ? 'PM' : 'AM';
+        const m = String(ev.startM).padStart(2, '0');
+        return { ev, text: `Next: ${ev.name} \u2014 Today at ${h}:${m} ${ampm}` };
+      }
+    }
+
+    // Check upcoming days (up to 7)
+    for (let offset = 1; offset <= 7; offset++) {
+      const futureDate = new Date(now);
+      futureDate.setDate(futureDate.getDate() + offset);
+      const futureEvents = getEventsForDate(futureDate);
+      for (const ev of futureEvents) {
+        const h = ev.startH > 12 ? ev.startH - 12 : ev.startH;
+        const ampm = ev.startH >= 12 ? 'PM' : 'AM';
+        const m = String(ev.startM).padStart(2, '0');
+        return { ev, text: `Next: ${ev.name} \u2014 ${dayNames[futureDate.getDay()]} at ${h}:${m} ${ampm}` };
+      }
+    }
+    return null;
+  }
+
+  // ── PRNG ──
+  function mulberry32(seed) {
+    return function() {
+      seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+      let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+  }
+
+  function generateSeed(eventName) {
+    let userSeed = localStorage.getItem('bingo_user_seed');
+    if (!userSeed) {
+      userSeed = String(Math.floor(Math.random() * 2147483647));
+      localStorage.setItem('bingo_user_seed', userSeed);
+    }
+    const now = nowET();
+    const dateStr = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}`;
+    const str = userSeed + eventName + dateStr;
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      hash = ((hash << 5) - hash) + str.charCodeAt(i);
+      hash |= 0;
+    }
+    return hash;
+  }
+
+  function generateBoard(eventName, guaranteedTile) {
+    const seed = generateSeed(eventName);
+    const rng = mulberry32(seed);
+    const pool = [...OPTIONS];
+    // Remove guaranteed tile from pool if present, so it's not duplicated
+    if (guaranteedTile) {
+      const gtLower = guaranteedTile.toLowerCase();
+      const idx = pool.findIndex(o => o.toLowerCase() === gtLower);
+      if (idx !== -1) pool.splice(idx, 1);
+    }
+    const totalTiles = GRID_SIZE * GRID_SIZE;
+    const centerIdx = Math.floor(totalTiles / 2);
+    const needed = totalTiles - 1 - (guaranteedTile ? 1 : 0); // minus free space, minus guaranteed
+
+    const selected = [];
+    for (let i = 0; i < needed && pool.length > 0; i++) {
+      const j = Math.floor(rng() * pool.length);
+      selected.push(pool.splice(j, 1)[0]);
+    }
+
+    // Insert guaranteed tile at a random non-center position
+    if (guaranteedTile) {
+      const pos = Math.floor(rng() * (selected.length + 1));
+      selected.splice(pos, 0, guaranteedTile);
+    }
+
+    // Insert free space at center
+    selected.splice(centerIdx, 0, FREE_TEXT);
+    return selected;
+  }
+
+  // ── State ──
+  let currentBoardKey = null;
+  let tiles = [];
+  let selections = new Set();
+  let activeLabelName = null;
+
+  function stateKey(eventName) {
+    const now = nowET();
+    return `bingo_${eventName}_${now.getFullYear()}_${now.getMonth()}_${now.getDate()}`;
+  }
+
+  function loadSelections(eventName) {
+    try {
+      const raw = localStorage.getItem(stateKey(eventName));
+      if (!raw) return new Set();
+      const data = JSON.parse(raw);
+      if (Date.now() - data.ts > PERSIST_MAX_MS) {
+        localStorage.removeItem(stateKey(eventName));
+        return new Set();
+      }
+      return new Set(data.sel);
+    } catch { return new Set(); }
+  }
+
+  function saveSelections(eventName) {
+    const data = { sel: [...selections], ts: Date.now() };
+    localStorage.setItem(stateKey(eventName), JSON.stringify(data));
+  }
+
+  // ── Board rendering ──
+  function renderBoard(eventName, guaranteedTile) {
+    tiles = generateBoard(eventName, guaranteedTile);
+    selections = loadSelections(eventName);
+    $board.innerHTML = '';
+
+    const centerIdx = Math.floor((GRID_SIZE * GRID_SIZE) / 2);
+
+    tiles.forEach((text, i) => {
+      const el = document.createElement('div');
+      el.className = 'tile';
+      el.innerHTML = '<div class="tile-bg"></div><div class="tile-bg-pressed"></div><span class="tile-text"></span>';
+      el.querySelector('.tile-text').textContent = text;
+
+      if (i === centerIdx) {
+        el.classList.add('free', 'selected');
+        selections.add(i);
+      } else {
+        if (selections.has(i)) el.classList.add('selected');
+        el.addEventListener('click', () => toggleTile(el, i, eventName));
+      }
+
+      $board.appendChild(el);
+    });
+
+    checkBingo();
+  }
+
+  function toggleTile(el, idx, eventName) {
+    if (selections.has(idx)) {
+      selections.delete(idx);
+      el.classList.remove('selected');
+    } else {
+      selections.add(idx);
+      el.classList.add('selected');
+    }
+
+    el.classList.remove('bounce');
+    void el.offsetWidth;
+    el.classList.add('bounce');
+
+    saveSelections(eventName);
+    checkBingo();
+  }
+
+  function checkBingo() {
+    const size = GRID_SIZE;
+    const lines = [];
+
+    for (let r = 0; r < size; r++) {
+      const line = [];
+      for (let c = 0; c < size; c++) line.push(r * size + c);
+      lines.push(line);
+    }
+    for (let c = 0; c < size; c++) {
+      const line = [];
+      for (let r = 0; r < size; r++) line.push(r * size + c);
+      lines.push(line);
+    }
+    const d1 = [], d2 = [];
+    for (let i = 0; i < size; i++) {
+      d1.push(i * size + i);
+      d2.push(i * size + (size - 1 - i));
+    }
+    lines.push(d1, d2);
+
+    const completedLines = lines.filter(line => line.every(idx => selections.has(idx)));
+    const count = completedLines.length;
+
+    if (count >= 2) {
+      $bingoBanner.textContent = '\uD83C\uDF1F DOUBLE BINGO! \uD83C\uDF1F';
+      $bingoBanner.classList.add('visible');
+    } else if (count === 1) {
+      $bingoBanner.textContent = '\uD83C\uDF89 BINGO! \uD83C\uDF89';
+      $bingoBanner.classList.add('visible');
+    } else {
+      $bingoBanner.classList.remove('visible');
+    }
+  }
+
+  // ── Main update ──
+  function update() {
+    const liveEvent = getCurrentEvent();
+
+    if (liveEvent) {
+      const key = 'live:' + liveEvent.name;
+      $eventLabel.textContent = liveEvent.name;
+      activeLabelName = liveEvent.name;
+
+      $statusBanner.className = 'status-banner live';
+      $statusBanner.innerHTML = '<span class="status-dot"></span> Live now';
+
+      if (currentBoardKey !== key) {
+        currentBoardKey = key;
+        renderBoard(liveEvent.name, liveEvent.guaranteedTile);
+      }
+    } else {
+      const next = getNextEvent();
+      const eventForBoard = next ? next.ev : SCHEDULE[0];
+      const key = 'preview:' + eventForBoard.name;
+
+      $eventLabel.textContent = eventForBoard.name;
+      activeLabelName = eventForBoard.name;
+
+      $statusBanner.className = 'status-banner preview';
+      $statusBanner.textContent = next
+        ? next.text + ' · Board resets at start'
+        : 'Preview board';
+
+      if (currentBoardKey !== key) {
+        currentBoardKey = key;
+        renderBoard(eventForBoard.name, eventForBoard.guaranteedTile);
+      }
+    }
+  }
+
+  // ── Sharing ──
+  function showToast(msg, duration) {
+    $toast.textContent = msg;
+    $toast.classList.add('visible');
+    setTimeout(() => $toast.classList.remove('visible'), duration || 2500);
+  }
+
+  $shareBtn.addEventListener('click', async () => {
+    showToast('Generating image\u2026', 4000);
+
+    try {
+      const captureArea = document.getElementById('capture-area');
+      const footer = document.createElement('div');
+      footer.style.cssText = 'text-align:center;font-family:Nunito,sans-serif;font-weight:700;font-size:13px;color:#a09488;padding:4px 0 8px;';
+      footer.textContent = 'Play more here: ' + SHARE_URL;
+      captureArea.appendChild(footer);
+
+      const canvas = await html2canvas(captureArea, {
+        backgroundColor: '#faf8ef',
+        scale: 2,
+        useCORS: true,
+        logging: false
+      });
+
+      captureArea.removeChild(footer);
+
+      const blob = await new Promise(r => canvas.toBlob(r, 'image/png'));
+      const file = new File([blob], 'som-bingo.png', { type: 'image/png' });
+
+      const label = activeLabelName || 'class';
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          title: 'SOM Bingo',
+          text: 'I\'m playing SOM Bingo during ' + label + '! \uD83C\uDFB2\nPlay here: ' + SHARE_URL,
+          files: [file]
+        });
+      } else {
+        const text = encodeURIComponent(
+          'I\'m playing SOM Bingo during ' + label + '! \uD83C\uDFB2\nPlay here: ' + SHARE_URL
+        );
+        window.open('https://wa.me/?text=' + text, '_blank');
+      }
+
+      $toast.classList.remove('visible');
+    } catch (err) {
+      console.error('Share error:', err);
+      showToast('Could not share \u2014 try again!', 2500);
+    }
+  });
+
+  // ── Init ──
+  update();
+  setInterval(update, POLL_INTERVAL);
+  setTimeout(function() { location.reload(); }, HARD_RELOAD_MS);
+
+})();
+</script>
+
+</body>
+</html>
