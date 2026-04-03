@@ -286,7 +286,7 @@
 
 <div id="app">
   <div class="header">
-    <h1>SOM Bingo</h1>
+    <h1>Gold Bingo</h1>
     <div class="event-label" id="event-label"></div>
   </div>
 
@@ -320,35 +320,30 @@
   const SHARE_URL = "https://tinyurl.com/GoldBingo";
 
   const OPTIONS = [
-    "\u201CIn the military\u2026\u201D",
+    "\u201CIn the army\u2026\u201D",
+    "\u201CIn the interest in time\u2026\u201D",
     "Alison apologizes while asking question",
-    "Alison is wearing a Yale baseball cap",
     "Silver scholar falls asleep",
-    "Baby!",
     "Clapping when class ends",
     "Applause for a good answer",
-    "Dan answers when no one else wants to",
-    "Dan gets the sign in sheet and checks to make sure no one else has been skipped",
+    "Dan answers when no one else will",
     "Derek explains medicine",
-    "Classmate disagrees with professor",
+    "Classmate argues with prof",
     "Florence gets a cookie",
-    "Izzy makes incredibly insightful comment",
-    "John mentions working in sales",
+    "John worked in sales",
     "Kemal nowhere to be found",
     "Kevin wears a beanie",
-    "Kshitija is emailing behind her name plaque",
+    "Kshitija emails behind name plate",
     "Liana surrenders phone",
     "Matt Kanzler shows up to class (rare)",
-    "Not clapping when class ends",
-    "Prof uses wrong color on the whiteboard",
-    "Professor outlaws further questions",
-    "Robichaud claps to silence the class",
-    "Someone starts a comment with \u201Cit\u2019s curious because\u2026\u201D",
-    "Swiss Tom talks for >60 seconds",
-    "Thomas Gould understands art or literature reference",
+    "Prof uses wrong color on whiteboard",
+    "Prof outlaws further questions",
+    "Robichaud claps to silence class",
+    "Question that's not a question",
+    "Diatribe lasts >60 seconds",
     "Jaussi lectures professor",
     "Jaussi wears tank top",
-    "Jaussi answers someone else's question",
+    "Classmate answers classmate's question",
     "Vini walks in late",
     "Wearing a suit"
   ];
@@ -667,7 +662,7 @@
     try {
       const captureArea = document.getElementById('capture-area');
       const footer = document.createElement('div');
-      footer.style.cssText = 'text-align:center;font-family:Nunito,sans-serif;font-weight:700;font-size:13px;color:#a09488;padding:4px 0 8px;';
+      footer.style.cssText = 'text-align:center;font-family:sans-serif;font-weight:700;font-size:13px;color:#a09488;padding:4px 0 8px;';
       footer.textContent = 'Play more here: ' + SHARE_URL;
       captureArea.appendChild(footer);
 
@@ -681,18 +676,18 @@
       captureArea.removeChild(footer);
 
       const blob = await new Promise(r => canvas.toBlob(r, 'image/png'));
-      const file = new File([blob], 'som-bingo.png', { type: 'image/png' });
+      const file = new File([blob], 'gold-bingo.png', { type: 'image/png' });
 
       const label = activeLabelName || 'class';
       if (navigator.canShare && navigator.canShare({ files: [file] })) {
         await navigator.share({
-          title: 'SOM Bingo',
-          text: 'I\'m playing SOM Bingo during ' + label + '! \uD83C\uDFB2\nPlay here: ' + SHARE_URL,
+          title: 'Gold Bingo',
+          text: 'Gold Bingo for ' + label + '! \uD83C\uDFB2\nPlay: ' + SHARE_URL,
           files: [file]
         });
       } else {
         const text = encodeURIComponent(
-          'I\'m playing SOM Bingo during ' + label + '! \uD83C\uDFB2\nPlay here: ' + SHARE_URL
+          'Gold Bingo for ' + label + '! \uD83C\uDFB2\nPlay: ' + SHARE_URL
         );
         window.open('https://wa.me/?text=' + text, '_blank');
       }
